@@ -28,7 +28,7 @@ grep -rn "CUSTOM PATCH" codex-rs
 
 - **分支** `custom-no-backoff`：承载全部自定义 commit（patch + CI workflow + 本文件 + 同步脚本），始终 rebase 叠在官方发布 tag 之上。
 - **remote**：`origin` = fork（`White-NX/codex`），`upstream` = `openai/codex`。
-- **CI**：`.github/workflows/build-custom.yml`，用 GitHub 托管 `windows-latest` 编译，产出 artifact `codex-windows-x64`（内含 `codex.exe`）。
+- **CI**：`.github/workflows/build-custom.yml`，用 GitHub 托管 `windows-latest` 编译，产出 artifact `codex-windows-x64`（内含 `codex.exe` 与 code mode 宿主程序 `codex-code-mode-host.exe`）。
 
 ## 常见任务
 
@@ -38,7 +38,7 @@ grep -rn "CUSTOM PATCH" codex-rs
 bash sync-custom.sh            # 跟随官方最新 stable release（推荐）
 bash sync-custom.sh --main     # 跟随最新开发版
 ```
-脚本会：fetch upstream → rebase 到目标版本 → **校验 patch 完整性** → force-push → 等 CI 编译 → 下载新 `codex.exe` 到 `D:\projects\codex-bin\`。
+脚本会：fetch upstream → rebase 到目标版本 → **校验 patch 完整性** → force-push → 等 CI 编译 → 下载新 `codex.exe` 与 `codex-code-mode-host.exe` 到 `D:\projects\codex-bin\`。
 
 ### ② 编译
 **绝不要在本地全量编译。** codex 是大型 Rust workspace，本地首编约 **1.5 小时**且占约 **8GB** 磁盘（曾撑爆磁盘）。**一律走 CI**：push 到 `custom-no-backoff` 会自动触发，或手动 `gh workflow run build-custom.yml --repo White-NX/codex --ref custom-no-backoff`。产物从 Actions run 的 Artifacts 下载。首次无缓存慢，之后有 `rust-cache`，增量编译约 10–30 分钟。
@@ -51,7 +51,7 @@ bash sync-custom.sh --main     # 跟随最新开发版
 4. 完成后**务必**确认 `grep -rho "CUSTOM PATCH" codex-rs/core/src/util.rs codex-rs/codex-client/src/retry.rs codex-rs/model-provider-info/src/lib.rs | wc -l` 仍为 **4**。
 
 ### ④ 使用二进制
-把 `D:\projects\codex-bin\codex.exe` 放进 PATH 或替换现有 codex。验证去退避生效：断流重连时日志 `Reconnecting… x/y` 的间隔应恒定（约 200ms）而非逐次翻倍。
+把 `D:\projects\codex-bin\` 整个目录放进 PATH 或替换现有 codex（`codex-code-mode-host.exe` 必须与 `codex.exe` 同目录，否则 code mode 不可用）。验证去退避生效：断流重连时日志 `Reconnecting… x/y` 的间隔应恒定（约 200ms）而非逐次翻倍。
 
 ## 关键坐标
 

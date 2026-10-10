@@ -111,9 +111,9 @@ fi
 
 echo "  · 下载 $ARTIFACT ..."
 mkdir -p "$OUT_DIR"
-rm -f "$OUT_DIR/codex.exe"
+rm -f "$OUT_DIR/codex.exe" "$OUT_DIR/codex-code-mode-host.exe"
 gh run download "$run_id" --repo "$FORK_REPO" --name "$ARTIFACT" --dir "$OUT_DIR"
 echo ""
 echo "✅ 完成！新二进制："
-ls -lh "$OUT_DIR/codex.exe"
+ls -lh "$OUT_DIR/codex.exe" "$OUT_DIR/codex-code-mode-host.exe"
 "$OUT_DIR/codex.exe" --version 2>&1 | head -1 || true
