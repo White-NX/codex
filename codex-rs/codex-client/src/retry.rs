@@ -44,7 +44,8 @@ pub fn backoff(base: Duration, attempt: u64) -> Duration {
     if attempt == 0 {
         return base;
     }
-    let exp = 2u64.saturating_pow(attempt as u32 - 1);
+    // CUSTOM PATCH: 去除指数退避 —— 固定为 base 延迟 + 抖动，忽略 attempt。
+    let exp = 1u64;
     let millis = base.as_millis() as u64;
     let raw = millis.saturating_mul(exp);
     let jitter: f64 = rand::rng().random_range(0.9..1.1);
