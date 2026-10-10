@@ -44,13 +44,28 @@ jobs:
         env:
           LIBSQLITE3_FLAGS: SQLITE_DISABLE_INTRINSIC   # Windows 编译 libsqlite3 必需
           CARGO_NET_GIT_FETCH_WITH_CLI: "true"          # 用 git CLI 拉取 git 依赖，避开 libgit2 偶发问题
-        run: cargo build --release --bin codex --bin codex-code-mode-host
+        run: |
+          STABLE_GIT_COMMIT="$(git rev-parse HEAD)"
+          export STABLE_GIT_COMMIT
+          cargo build --release \
+            --bin codex \
+            --bin codex-code-mode-host \
+            --bin codex-responses-api-proxy \
+            --bin codex-windows-sandbox-setup \
+            --bin codex-windows-sandbox-service \
+            --bin codex-command-runner \
+            --bin codex-app-server
 
-      - name: Upload codex.exe
+      - name: Upload codex binaries
         uses: actions/upload-artifact@v4
         with:
           name: codex-windows-x64
           path: |
             codex-rs/target/release/codex.exe
             codex-rs/target/release/codex-code-mode-host.exe
+            codex-rs/target/release/codex-responses-api-proxy.exe
+            codex-rs/target/release/codex-windows-sandbox-setup.exe
+            codex-rs/target/release/codex-windows-sandbox-service.exe
+            codex-rs/target/release/codex-command-runner.exe
+            codex-rs/target/release/codex-app-server.exe
           if-no-files-found: error

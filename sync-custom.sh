@@ -55,7 +55,13 @@ echo "  → 目标版本: $TARGET"
 
 echo "▶ 3/6 将定制 patch rebase 到 $TARGET"
 git switch "$BRANCH"
-if ! git rebase "$TARGET"; then
+PREV_TAG=$(git describe --tags --abbrev=0 "$BRANCH" 2>/dev/null || true)
+if [ -n "$PREV_TAG" ] && [ "$PREV_TAG" != "$TARGET" ]; then
+  rebase_cmd=(git rebase --onto "$TARGET" "$PREV_TAG" "$BRANCH")
+else
+  rebase_cmd=(git rebase "$TARGET")
+fi
+if ! "${rebase_cmd[@]}"; then
   {
     echo ""
     echo "  ✗ rebase 出现冲突，请手动处理："
@@ -69,11 +75,11 @@ fi
 
 echo "▶ 4/6 校验 patch 完整性"
 markers=$(grep -rho "CUSTOM PATCH" \
-  codex-rs/core/src/util.rs codex-rs/codex-client/src/retry.rs \
+  codex-rs/async-utils/src/backoff.rs codex-rs/codex-client/src/retry.rs \
   codex-rs/model-provider-info/src/lib.rs | wc -l | tr -d ' ')
 if [ "$markers" != "$EXPECTED_MARKERS" ]; then
   echo "  ✗ 期望 $EXPECTED_MARKERS 处 CUSTOM PATCH 标记，实际 $markers 处 —— patch 可能在 rebase 中丢失/损坏！" >&2
-  echo "    请检查 util.rs、retry.rs 与 model-provider-info/src/lib.rs 后再推送。" >&2
+  echo "    请检查 async-utils/src/backoff.rs、retry.rs 与 model-provider-info/src/lib.rs 后再推送。" >&2
   exit 1
 fi
 echo "  ✓ patch 完整（$markers 处标记）"
@@ -111,9 +117,9 @@ fi
 
 echo "  · 下载 $ARTIFACT ..."
 mkdir -p "$OUT_DIR"
-rm -f "$OUT_DIR/codex.exe" "$OUT_DIR/codex-code-mode-host.exe"
+rm -f "$OUT_DIR"/codex*.exe
 gh run download "$run_id" --repo "$FORK_REPO" --name "$ARTIFACT" --dir "$OUT_DIR"
 echo ""
 echo "✅ 完成！新二进制："
-ls -lh "$OUT_DIR/codex.exe" "$OUT_DIR/codex-code-mode-host.exe"
+ls -lh "$OUT_DIR"/codex*.exe
 "$OUT_DIR/codex.exe" --version 2>&1 | head -1 || true

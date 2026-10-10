@@ -16,7 +16,7 @@ grep -rn "CUSTOM PATCH" codex-rs
 
 | 文件 | 改动 | 层级 |
 |---|---|---|
-| `codex-rs/core/src/util.rs` | `backoff()` 指数因子改为固定（`powi(0)`） | SSE 流级重试 |
+| `codex-rs/async-utils/src/backoff.rs` | `backoff()` 指数因子改为固定（`powi(0)`） | SSE 流级重试（通过 `core/src/util.rs` 重新导出） |
 | `codex-rs/codex-client/src/retry.rs` | `backoff()` 指数项改为 `1u64` | HTTP 请求级重试 |
 | `codex-rs/model-provider-info/src/lib.rs` | `request_max_retries()` / `stream_max_retries()` 移除 `.min(100)` 硬上限（连同 `MAX_*_MAX_RETRIES` 常量） | 配置级重试上限 |
 
@@ -28,7 +28,7 @@ grep -rn "CUSTOM PATCH" codex-rs
 
 - **分支** `custom-no-backoff`：承载全部自定义 commit（patch + CI workflow + 本文件 + 同步脚本），始终 rebase 叠在官方发布 tag 之上。
 - **remote**：`origin` = fork（`White-NX/codex`），`upstream` = `openai/codex`。
-- **CI**：`.github/workflows/build-custom.yml`，用 GitHub 托管 `windows-latest` 编译，产出 artifact `codex-windows-x64`（内含 `codex.exe` 与 code mode 宿主程序 `codex-code-mode-host.exe`）。
+- **CI**：`.github/workflows/build-custom.yml`，用 GitHub 托管 `windows-latest` 编译，产出 artifact `codex-windows-x64`（内含完整 Windows 独立二进制套件：`codex.exe`、`codex-code-mode-host.exe`、`codex-responses-api-proxy.exe`、`codex-windows-sandbox-setup.exe`、`codex-windows-sandbox-service.exe`、`codex-command-runner.exe`、`codex-app-server.exe`）。
 
 ## 常见任务
 
@@ -38,7 +38,7 @@ grep -rn "CUSTOM PATCH" codex-rs
 bash sync-custom.sh            # 跟随官方最新 stable release（推荐）
 bash sync-custom.sh --main     # 跟随最新开发版
 ```
-脚本会：fetch upstream → rebase 到目标版本 → **校验 patch 完整性** → force-push → 等 CI 编译 → 下载新 `codex.exe` 与 `codex-code-mode-host.exe` 到 `D:\projects\codex-bin\`。
+脚本会：fetch upstream → rebase 到目标版本 → **校验 patch 完整性** → force-push → 等 CI 编译 → 下载全部 Windows 独立二进制到 `D:\projects\codex-bin\`。
 
 ### ② 编译
 **绝不要在本地全量编译。** codex 是大型 Rust workspace，本地首编约 **1.5 小时**且占约 **8GB** 磁盘（曾撑爆磁盘）。**一律走 CI**：push 到 `custom-no-backoff` 会自动触发，或手动 `gh workflow run build-custom.yml --repo White-NX/codex --ref custom-no-backoff`。产物从 Actions run 的 Artifacts 下载。首次无缓存慢，之后有 `rust-cache`，增量编译约 10–30 分钟。
@@ -48,10 +48,10 @@ bash sync-custom.sh --main     # 跟随最新开发版
 1. `grep -rn "CUSTOM PATCH" codex-rs` 定位你的改动；
 2. 保留固定退避逻辑与无上限重试，合并官方其余改动；
 3. `git add <文件> && git rebase --continue`；
-4. 完成后**务必**确认 `grep -rho "CUSTOM PATCH" codex-rs/core/src/util.rs codex-rs/codex-client/src/retry.rs codex-rs/model-provider-info/src/lib.rs | wc -l` 仍为 **4**。
+4. 完成后**务必**确认 `grep -rho "CUSTOM PATCH" codex-rs/async-utils/src/backoff.rs codex-rs/codex-client/src/retry.rs codex-rs/model-provider-info/src/lib.rs | wc -l` 仍为 **4**。
 
 ### ④ 使用二进制
-把 `D:\projects\codex-bin\` 整个目录放进 PATH 或替换现有 codex（`codex-code-mode-host.exe` 必须与 `codex.exe` 同目录，否则 code mode 不可用）。验证去退避生效：断流重连时日志 `Reconnecting… x/y` 的间隔应恒定（约 200ms）而非逐次翻倍。
+把 `D:\projects\codex-bin\` 整个目录放进 PATH 或替换现有 codex（`codex-code-mode-host.exe` 负责 Code Mode，`codex-command-runner.exe`、`codex-windows-sandbox-setup.exe` 与 `codex-windows-sandbox-service.exe` 负责 Windows 沙盒执行，`codex-app-server.exe` 负责桌面及扩展通信，均必须与 `codex.exe` 位于同目录）。验证去退避生效：断流重连时日志 `Reconnecting… x/y` 的间隔应恒定（约 200ms）而非逐次翻倍。
 
 ## 关键坐标
 
