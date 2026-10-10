@@ -22,7 +22,7 @@ UPSTREAM_REPO="openai/codex"
 WORKFLOW="build-custom.yml"
 ARTIFACT="codex-windows-x64"
 OUT_DIR="/d/projects/codex-bin"
-EXPECTED_MARKERS=2          # CUSTOM PATCH 标记数：util.rs 1 + retry.rs 1
+EXPECTED_MARKERS=4          # CUSTOM PATCH 标记数：util.rs 1 + retry.rs 1 + model-provider-info 2
 
 # ---- 参数 ----
 WAIT=1
@@ -69,10 +69,11 @@ fi
 
 echo "▶ 4/6 校验 patch 完整性"
 markers=$(grep -rho "CUSTOM PATCH" \
-  codex-rs/core/src/util.rs codex-rs/codex-client/src/retry.rs | wc -l | tr -d ' ')
+  codex-rs/core/src/util.rs codex-rs/codex-client/src/retry.rs \
+  codex-rs/model-provider-info/src/lib.rs | wc -l | tr -d ' ')
 if [ "$markers" != "$EXPECTED_MARKERS" ]; then
   echo "  ✗ 期望 $EXPECTED_MARKERS 处 CUSTOM PATCH 标记，实际 $markers 处 —— patch 可能在 rebase 中丢失/损坏！" >&2
-  echo "    请检查 util.rs 与 retry.rs 的 backoff() 函数后再推送。" >&2
+  echo "    请检查 util.rs、retry.rs 与 model-provider-info/src/lib.rs 后再推送。" >&2
   exit 1
 fi
 echo "  ✓ patch 完整（$markers 处标记）"

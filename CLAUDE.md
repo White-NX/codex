@@ -5,9 +5,9 @@
 
 ## 这个 fork 是什么
 
-本仓库是 **openai/codex 的个人定制 fork**，唯一目的：**去除模型 API 请求与 SSE 流的指数退避（exponential backoff）**，让失败重试以固定延迟进行。除此之外与官方完全一致，并持续跟随官方更新。
+本仓库是 **openai/codex 的个人定制 fork**，唯一目的：**去除模型 API 请求与 SSE 流的指数退避（exponential backoff）**，让失败重试以固定延迟进行；同时**移除重试次数的 100 次硬上限**，让 `request_max_retries` / `stream_max_retries` 完全由配置决定。除此之外与官方完全一致，并持续跟随官方更新。
 
-## 唯一的代码改动（共 3 行，务必保持最小）
+## 唯一的代码改动（务必保持最小）
 
 所有自定义源码改动都带注释标记 `CUSTOM PATCH`。定位命令：
 ```bash
@@ -18,8 +18,9 @@ grep -rn "CUSTOM PATCH" codex-rs
 |---|---|---|
 | `codex-rs/core/src/util.rs` | `backoff()` 指数因子改为固定（`powi(0)`） | SSE 流级重试 |
 | `codex-rs/codex-client/src/retry.rs` | `backoff()` 指数项改为 `1u64` | HTTP 请求级重试 |
+| `codex-rs/model-provider-info/src/lib.rs` | `request_max_retries()` / `stream_max_retries()` 移除 `.min(100)` 硬上限（连同 `MAX_*_MAX_RETRIES` 常量） | 配置级重试上限 |
 
-**刻意保留、未改动**：重试次数上限（`request_max_retries` / `stream_max_retries`）、服务端 `Retry-After` 尊重逻辑（`core/src/responses_retry.rs`）、随机抖动 jitter。
+**刻意保留、未改动**：重试默认值（stream 5 / request 4）、服务端 `Retry-After` 尊重逻辑（`core/src/responses_retry.rs`）、随机抖动 jitter。
 
 **⚠️ 铁律**：不要扩大改动范围。本 fork 的全部价值在于 diff 极小、易于永久跟随官方。任何新需求，先判断能否用配置（`~/.codex/config.toml`）而非改源码实现。
 
@@ -45,9 +46,9 @@ bash sync-custom.sh --main     # 跟随最新开发版
 ### ③ rebase 冲突处理
 概率极低（只动 2 个稳定函数 + 独立新文件）。若发生：
 1. `grep -rn "CUSTOM PATCH" codex-rs` 定位你的改动；
-2. 保留固定退避逻辑，合并官方其余改动；
+2. 保留固定退避逻辑与无上限重试，合并官方其余改动；
 3. `git add <文件> && git rebase --continue`；
-4. 完成后**务必**确认 `grep -rho "CUSTOM PATCH" codex-rs/core/src/util.rs codex-rs/codex-client/src/retry.rs | wc -l` 仍为 **2**。
+4. 完成后**务必**确认 `grep -rho "CUSTOM PATCH" codex-rs/core/src/util.rs codex-rs/codex-client/src/retry.rs codex-rs/model-provider-info/src/lib.rs | wc -l` 仍为 **4**。
 
 ### ④ 使用二进制
 把 `D:\projects\codex-bin\codex.exe` 放进 PATH 或替换现有 codex。验证去退避生效：断流重连时日志 `Reconnecting… x/y` 的间隔应恒定（约 200ms）而非逐次翻倍。
@@ -61,4 +62,4 @@ bash sync-custom.sh --main     # 跟随最新开发版
 | CI workflow | `build-custom`（`.github/workflows/build-custom.yml`） |
 | artifact 名 | `codex-windows-x64` |
 | 二进制输出目录 | `D:\projects\codex-bin\` |
-| patch 标记 | `CUSTOM PATCH`（应恰好 2 处） |
+| patch 标记 | `CUSTOM PATCH`（应恰好 4 处） |

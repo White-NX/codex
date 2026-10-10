@@ -1,4 +1,4 @@
-# 精简自定义编译：产出带「去指数退避」patch 的 Windows x64 codex.exe。
+# 精简自定义编译：产出带「去指数退避 + 无限重试上限」patch 的 Windows x64 codex.exe。
 # 触发方式：Actions 页面手动 Run，或 push 到 custom-no-backoff 分支。
 name: build-custom
 

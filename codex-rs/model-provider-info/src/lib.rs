@@ -76,10 +76,6 @@ const DEFAULT_REQUEST_MAX_RETRIES: u64 = 4;
 const DEFAULT_CREDENTIAL_EXPORT_TIMEOUT_MS: u64 = 30_000;
 const DEFAULT_AWS_AUTH_REFRESH_TIMEOUT_MS: u64 = 300_000;
 pub const DEFAULT_WEBSOCKET_CONNECT_TIMEOUT_MS: u64 = 15_000;
-/// Hard cap for user-configured `stream_max_retries`.
-const MAX_STREAM_MAX_RETRIES: u64 = 100;
-/// Hard cap for user-configured `request_max_retries`.
-const MAX_REQUEST_MAX_RETRIES: u64 = 100;
 
 pub const OPENAI_PROVIDER_NAME: &str = "OpenAI";
 const OPENAI_ACTOR_AUTHORIZATION_HEADER: &str = "x-openai-actor-authorization";
@@ -544,16 +540,14 @@ other non-default provider fields are not supported"
 
     /// Effective maximum number of request retries for this provider.
     pub fn request_max_retries(&self) -> u64 {
-        self.request_max_retries
-            .unwrap_or(DEFAULT_REQUEST_MAX_RETRIES)
-            .min(MAX_REQUEST_MAX_RETRIES)
+        // CUSTOM PATCH: 移除 100 次硬上限 —— 重试次数完全由配置决定，不再截断。
+        self.request_max_retries.unwrap_or(DEFAULT_REQUEST_MAX_RETRIES)
     }
 
     /// Effective maximum number of stream reconnection attempts for this provider.
     pub fn stream_max_retries(&self) -> u64 {
-        self.stream_max_retries
-            .unwrap_or(DEFAULT_STREAM_MAX_RETRIES)
-            .min(MAX_STREAM_MAX_RETRIES)
+        // CUSTOM PATCH: 移除 100 次硬上限 —— 重试次数完全由配置决定，不再截断。
+        self.stream_max_retries.unwrap_or(DEFAULT_STREAM_MAX_RETRIES)
     }
 
     /// Effective idle timeout for streaming responses.
