@@ -33,6 +33,12 @@ jobs:
         with:
           workspaces: codex-rs
 
+      # 官方 denoland 的 v8 预编译包没有 Windows 的 ptrcomp+sandbox 变体；
+      # 必须用 openai/codex 自发布（rusty-v8-v150.4.0 标签）的资产，否则 404。
+      - uses: ./.github/actions/setup-rusty-v8
+        with:
+          target: x86_64-pc-windows-msvc
+
       - name: Build codex (release)
         shell: bash
         env:
