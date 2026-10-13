@@ -10,12 +10,19 @@ on:
 jobs:
   build-windows-x64:
     runs-on: windows-latest
-    timeout-minutes: 90
+    timeout-minutes: 180
     defaults:
       run:
         working-directory: codex-rs
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # 优化1：关闭 Windows Defender 实时监控，避免扫描海量编译临时文件造成 I/O 抢占与延迟。
+      - name: Disable Windows Defender
+        shell: pwsh
+        run: Set-MpPreference -DisableRealtimeMonitoring $true
 
       # codex 依赖层级深，Windows 必须开启长路径，否则 checkout/编译会失败。
       - name: Enable Git long paths
@@ -39,22 +46,51 @@ jobs:
         with:
           target: x86_64-pc-windows-msvc
 
-      - name: Build codex (release)
+      # 优化2：无侵入式 Cargo 调优（关 ThinLTO、关 PDB 调试信息、加大 codegen 并 strip），
+      # 且仅编译带有 patch 的核心主程序 codex.exe，彻底消除多二进制重复链接瓶颈。
+      - name: Build custom codex (release)
         shell: bash
         env:
           LIBSQLITE3_FLAGS: SQLITE_DISABLE_INTRINSIC   # Windows 编译 libsqlite3 必需
           CARGO_NET_GIT_FETCH_WITH_CLI: "true"          # 用 git CLI 拉取 git 依赖，避开 libgit2 偶发问题
+          CARGO_PROFILE_RELEASE_LTO: "off"
+          CARGO_PROFILE_RELEASE_DEBUG: "none"
+          CARGO_PROFILE_RELEASE_CODEGEN_UNITS: "16"
+          CARGO_PROFILE_RELEASE_STRIP: "true"
         run: |
           STABLE_GIT_COMMIT="$(git rev-parse HEAD)"
           export STABLE_GIT_COMMIT
-          cargo build --release \
-            --bin codex \
-            --bin codex-code-mode-host \
-            --bin codex-responses-api-proxy \
-            --bin codex-windows-sandbox-setup \
-            --bin codex-windows-sandbox-service \
-            --bin codex-command-runner \
-            --bin codex-app-server
+          cargo build --release --bin codex
+
+      # 优化3：其余 6 个附属二进制（沙盒/代码模式等）未打 patch，与官方 100% 一致。
+      # 直接从 openai/codex 对应 tag 的官方 Release 中拉取，秒级组合成全套 Windows 二进制套件。
+      - name: Pull official companion binaries
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG=$(git describe --tags --abbrev=0 2>/dev/null || gh release view --repo openai/codex --json tagName -q .tagName)
+          echo "Using companion binaries from upstream release: $TAG"
+          mkdir -p target/release
+          COMPANIONS=(
+            "codex-code-mode-host"
+            "codex-responses-api-proxy"
+            "codex-windows-sandbox-setup"
+            "codex-windows-sandbox-service"
+            "codex-command-runner"
+            "codex-app-server"
+          )
+          for name in "${COMPANIONS[@]}"; do
+            echo "Fetching $name from upstream release $TAG..."
+            gh release download "$TAG" --repo openai/codex \
+              --pattern "${name}-x86_64-pc-windows-msvc.exe" \
+              -O "target/release/${name}.exe" || {
+                echo "Warning: Failed to fetch $name for $TAG, attempting without tag..."
+                gh release download --repo openai/codex \
+                  --pattern "${name}-x86_64-pc-windows-msvc.exe" \
+                  -O "target/release/${name}.exe"
+              }
+          done
 
       - name: Upload codex binaries
         uses: actions/upload-artifact@v4
